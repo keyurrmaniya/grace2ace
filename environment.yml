@@ -1,0 +1,13 @@
+# Conda part of the single grace2ace env. Everything else (GRACE + TensorFlow with
+# CUDA libraries, ASSYST, pacemaker, grace2ace) is pip-installed from git clones by
+# scripts/setup_workspace.sh, which uses this file.
+name: grace2ace
+channels: [conda-forge]
+dependencies:
+  - python=3.11
+  - pip
+  - cmake
+  - make
+  - gcc_linux-64
+  - gxx_linux-64
+  - git

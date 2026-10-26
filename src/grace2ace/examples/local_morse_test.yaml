@@ -1,0 +1,60 @@
+# Runs on a login node or laptop in a few minutes, no GPU, no GRACE:
+# a Morse potential stands in for the teacher. Only for testing the pipeline.
+#
+#   grace2ace run local_morse_test.yaml --local
+
+system:
+  name: local_morse_test
+  elements: [Ni, Al]
+  seed: 7
+  run_dir: null
+
+teacher:
+  calculator: morse
+  params: {epsilon: 0.5, r0: 2.5, rho0: 4.0}
+
+assyst:
+  range: [0, 3]
+  trim: [1, 3]
+  spacegroups: all
+  shuffle_spacegroups: true
+  structures_per_formula: 4
+  tolerance: metallic
+  relax:
+    - {type: VolumeRelax, max_steps: 30, force_tolerance: 1.0e-2}
+    - {type: FullRelax,   max_steps: 30, force_tolerance: 1.0e-2}
+  perturbations:
+    - stretch: {hydro: 0.05, shear: 0.02}
+    - [{stretch: {hydro: 0.05, shear: 0.005}}, {rattle: {sigma: 0.05, create_supercells: true}}]
+  perturb_retries: 5
+  distance_radii: {Ni: 1.0, Al: 1.0}
+  n_shards: 2
+
+filters:
+  max_volume_per_atom: 60.0
+  min_energy_per_atom: -50.0
+  max_energy_per_atom: 50.0
+  max_force: 50.0
+
+dataset:
+  test_fraction: 0.2
+  reference_energy: freeze
+
+fit:
+  input:
+    potential:
+      functions:
+        UNARY:  {nradmax_by_orders: [4, 2], lmax_by_orders: [0, 1]}
+        BINARY: {nradmax_by_orders: [3, 1], lmax_by_orders: [0, 0]}
+    fit:
+      maxiter: 20
+      fit_cycles: 1
+      weighting: {nfit: 2000, DElow: 1.0, DEup: 50.0, DFup: 50.0}
+    backend: {batch_size: 50, display_step: 10}
+  max_attempts: 3
+
+envs:
+  generate: ~/miniconda3/envs/grace2ace/bin/python   # one env: ASSYST + GRACE + pacemaker
+  fit: ~/miniconda3/envs/grace2ace/bin/python        # the same python; two envs also work
+
+executor: local

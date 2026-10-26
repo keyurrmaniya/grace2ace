@@ -1,0 +1,59 @@
+# Default pacemaker input for grace2ace.
+#
+# Based on NiAlW-Ternary/test_05_r4 (the best Ni-Al-W fit so far), with every
+# key checked against pyace 0.2.7's source. Anything you put under `fit.input`
+# in your run config is deep-merged over this file.
+#
+# Filled in automatically -- do not set them yourself:
+#   cutoff             = largest bonds.*.rcut (pacemaker requires the key but never uses it)
+#   seed               = system.seed
+#   metadata           = run name, teacher, grace2ace version
+#   data               = train/test files written by build_df + the frozen reference energy
+#   potential.elements = system.elements
+
+potential:
+  embeddings:
+    ALL: {npot: FinnisSinclairShiftedScaled, fs_parameters: [1, 1, 1, 0.5], ndensity: 2}
+
+  bonds:
+    # radparameters is ChebExpCos' lambda; SBessel ignores the VALUE but the
+    # C++ basis constructor reads radparameters[0] for every radbase and
+    # segfaults if the key is missing. Keep it.
+    ALL: {radbase: SBessel, radparameters: [6.0], rcut: 6.0, dcut: 0.01, NameOfCutoffFunction: cos}
+
+  functions:
+    UNARY:   {nradmax_by_orders: [15, 6, 4, 3, 2], lmax_by_orders: [0, 4, 3, 2, 1]}
+    BINARY:  {nradmax_by_orders: [12, 4, 2, 2],    lmax_by_orders: [0, 3, 2, 1]}
+    TERNARY: {nradmax_by_orders: [10, 3, 2],       lmax_by_orders: [0, 2, 1]}
+
+fit:
+  loss:
+    kappa: 0.45            # FORCE weight: loss = (1-kappa)*E + kappa*F
+    L1_coeffs: 1.0e-8      # NOT "L1"/"L2" -- those are silently ignored
+    L2_coeffs: 1.0e-8
+
+  weighting:
+    type: EnergyBasedWeightingPolicy
+    nfit: 46000            # must exceed the number of structures below DElow (checked)
+    DElow: 0.5
+    DEup: 2.0
+    DFup: 8.0
+    DE: 1.0
+    DF: 1.0
+    wlow: 0.8
+    energy: convex_hull
+    seed: 42
+
+  optimizer: BFGS
+  maxiter: 500             # per fit cycle
+  fit_cycles: 4
+
+  min_relative_test_loss_per_iter: 1.0e-5
+  early_stopping_patience: 200
+
+  repulsion: auto
+
+backend:
+  evaluator: tensorpot
+  batch_size: 1000
+  display_step: 50

@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grace2ace"
+dynamic = ["version"]
+description = "Distil GRACE foundation models into ACE potentials: ASSYST structures -> GRACE labels -> pacemaker fit, on SLURM or locally."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+authors = [{ name = "Keyur Maniya" }]
+# Kept loose on purpose: the package is installed into two existing conda
+# environments (GRACE side and pacemaker side) whose pinned versions differ.
+dependencies = [
+    "numpy",
+    "pandas",
+    "ase",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+# Structure generation and labelling (ASSYST + GRACE).
+generate = ["assyst", "tensorpotential"]
+# Fitting and evaluation. python-ace (pacemaker) is not on PyPI under this
+# name in all versions; install it from https://github.com/ICAMS/python-ace.
+fit = ["matplotlib"]
+test = ["pytest"]
+
+[project.scripts]
+grace2ace = "grace2ace.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "grace2ace._version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+grace2ace = ["templates/*", "examples/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: needs pyace/pacemaker or GRACE and takes minutes",
+]

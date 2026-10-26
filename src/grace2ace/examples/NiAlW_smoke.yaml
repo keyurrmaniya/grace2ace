@@ -1,0 +1,68 @@
+# Ni-Al smoke test on SLURM with GRACE: tiny, finishes in well under an hour.
+# Checks that every stage, the env switch and the job chain work before you
+# spend GPU-days on the real run.
+
+system:
+  name: NiAlW_smoke
+  elements: [Ni, Al]
+  seed: 1
+  run_dir: null
+
+teacher:
+  calculator: grace
+  model: GRACE-2L-SMAX-OMAT-large
+
+assyst:
+  range: [0, 4]
+  trim: [1, 4]
+  spacegroups: all
+  shuffle_spacegroups: true
+  structures_per_formula: 6
+  tolerance: metallic
+  relax:
+    - {type: VolumeRelax, max_steps: 50, force_tolerance: 1.0e-3}
+    - {type: FullRelax,   max_steps: 50, force_tolerance: 1.0e-3}
+  perturbations:
+    - stretch: {hydro: 0.05, shear: 0.02}
+    - [{stretch: {hydro: 0.05, shear: 0.005}}, {rattle: {sigma: 0.05, create_supercells: true}}]
+  perturb_retries: 5
+  distance_radii: {Ni: 1.0, Al: 1.15}
+  n_shards: 2
+
+filters:
+  max_volume_per_atom: 40.0
+  min_energy_per_atom: -15.0
+  max_energy_per_atom: 5.0
+  max_force: 20.0
+
+dataset:
+  test_fraction: 0.15
+  reference_energy: freeze
+
+fit:
+  input:
+    potential:
+      functions:
+        UNARY:  {nradmax_by_orders: [8, 4, 2], lmax_by_orders: [0, 2, 1]}
+        BINARY: {nradmax_by_orders: [6, 2],    lmax_by_orders: [0, 1]}
+    fit:
+      maxiter: 100
+      fit_cycles: 2
+      weighting: {nfit: 5000}
+    backend: {batch_size: 200}
+  max_attempts: 3
+  timeout_margin_minutes: 5
+
+envs:
+  generate: ~/miniconda3/envs/grace2ace/bin/python   # one env: ASSYST + GRACE + pacemaker
+  fit: ~/miniconda3/envs/grace2ace/bin/python        # the same python; two envs also work
+
+executor: slurm
+slurm:
+  account: null
+  setup: [ulimit -l unlimited]
+  generate: {partition: gpu, time: "00:30:00", gpus: 1, cpus: 8}
+  label:    {partition: gpu, time: "00:30:00", gpus: 1, cpus: 8}
+  build_df: {partition: cpu, time: "00:30:00", gpus: 0, cpus: 4}
+  fit:      {partition: gpu, time: "00:30:00", gpus: 1, cpus: 8}
+  evaluate: {partition: cpu, time: "00:30:00", gpus: 0, cpus: 4}

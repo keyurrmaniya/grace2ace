@@ -1,0 +1,86 @@
+# Ni-Al-W, the full one-shot recipe.
+#
+# Structures: the same recipe as NiAlW-Ternary/test_05 (random crystals of
+# 1-10 atoms in all 230 space groups, volume + full relaxation, 10 strain /
+# rattle perturbations per relaxed cell), labelled by GRACE-2L-SMAX-OMAT-large.
+# Fit: the test_05_r4 settings, with L1_coeffs/L2_coeffs at 1e-8 (the template default).
+#
+#   grace2ace run NiAlW_00.yaml          # submit everything
+#   grace2ace status runs/NiAlW_00       # watch it
+
+system:
+  name: NiAlW_00
+  elements: [Ni, Al, W]
+  seed: 42
+  run_dir: null              # default ./runs/<name>; put it on a big filesystem
+
+teacher:
+  calculator: grace
+  model: GRACE-2L-SMAX-OMAT-large
+
+assyst:
+  range: [0, 9]              # Formulas.range(elements, 0, 9): 0..8 atoms of each element
+  trim: [1, 10]              # keep formulas with 1..10 atoms in total
+  spacegroups: all
+  shuffle_spacegroups: true
+  structures_per_formula: 230
+  tolerance: metallic
+  relax:
+    - {type: VolumeRelax, max_steps: 200, force_tolerance: 1.0e-3}
+    - {type: FullRelax,   max_steps: 200, force_tolerance: 1.0e-3}
+  perturbations:
+    # equation of state: hydrostatic strain
+    - stretch: {hydro: 0.15, shear: 0.02}
+    - stretch: {hydro: 0.10, shear: 0.02}
+    - stretch: {hydro: 0.05, shear: 0.02}
+    # shear
+    - stretch: {hydro: 0.05, shear: 0.05}
+    - stretch: {hydro: 0.05, shear: 0.10}
+    # phonons at the relaxed volume
+    - rattle: {sigma: 0.03, create_supercells: true}
+    - rattle: {sigma: 0.08, create_supercells: true}
+    # strain + rattle
+    - [{stretch: {hydro: 0.05, shear: 0.005}}, {rattle: {sigma: 0.05, create_supercells: true}}]
+    - [{stretch: {hydro: 0.05, shear: 0.005}}, {rattle: {sigma: 0.10, create_supercells: true}}]
+    - [{stretch: {hydro: 0.05, shear: 0.005}}, {rattle: {sigma: 0.15, create_supercells: true}}]
+  perturb_retries: 5
+  distance_radii: {Ni: 1.0, Al: 1.15, W: 1.1}
+  n_shards: 10               # 10 GPUs in parallel: the 4 h of relaxations become ~25 min
+
+filters:
+  max_volume_per_atom: 40.0
+  min_energy_per_atom: -15.0  # W-rich cells sit near -13 eV/atom; check drop_report_*.json
+  max_energy_per_atom: 5.0
+  max_force: 20.0
+
+extra_data: []
+# e.g. the GRACE liquid snapshots (fix the W-rich gap first, see README):
+#  - {path: /path/to/Liquid_NiAlW_df.pckl.gz, name: liquid}
+
+dataset:
+  test_fraction: 0.1
+  reference_energy: freeze
+
+fit:
+  input: {}                  # overrides of templates/pacemaker_default.yaml (= test_05_r4)
+  max_attempts: 5
+  timeout_margin_minutes: 20
+
+envs:
+  generate: ~/miniconda3/envs/grace2ace/bin/python   # one env: ASSYST + GRACE + pacemaker
+  fit: ~/miniconda3/envs/grace2ace/bin/python        # the same python; two envs also work
+
+executor: slurm
+slurm:
+  account: null              # your SLURM account
+  setup:
+    - ulimit -l unlimited
+    - export UCX_MEMTYPE_CACHE=n
+    - export UCX_ERROR_SIGNALS=""
+    - export OMPI_MCA_pml=ob1
+    - export OMPI_MCA_btl=self,tcp
+  generate: {partition: gpu, time: "03:00:00", gpus: 1, cpus: 12}
+  label:    {partition: gpu, time: "02:00:00", gpus: 1, cpus: 12}
+  build_df: {partition: cpu, time: "04:00:00", gpus: 0, cpus: 8}
+  fit:      {partition: gpu, time: "48:00:00", gpus: 1, cpus: 16}
+  evaluate: {partition: cpu, time: "04:00:00", gpus: 0, cpus: 8}
